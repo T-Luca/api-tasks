@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by PhpStorm.
- * User: iongh
- * Date: 8/1/2018
- * Time: 3:37 PM
- */
 
 namespace App\Http\Controllers\v1;
 
@@ -17,6 +11,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use App\UserToken;
 use App\Services\UserService;
+use Illuminate\Support\Facades\Session;
 use Carbon\Carbon;
 
 class UserController extends Controller
@@ -68,54 +63,123 @@ class UserController extends Controller
 
     /**
      * Register user
-     *
-     * @param Request $request
-     *
-     * @return \Illuminate\Http\JsonResponse
      */
-    public function register(Request $request)
+    public function register(Request $request, User $userModel)
     {
         $rules = [
-            'name' => 'required',
-            'email' => 'required|email|unique:user',
-            'password' => 'required|min:6',
-            'retypePassword' => 'required_with:password|same:password'
+            'name'     => 'required',
+            'email'    => 'required|email', //|unique:email
+            'password' => 'required'
         ];
+
         $messages = [
-            'name.required' => 'name required',
-            'email.required' => 'email required',
-            'email.email' => 'email invalid',
-            'email.unique' => 'email registered',
-            'password.required' => 'password required',
-            'password.min' => 'password min',
-            'retypePassword.required_with' => 'retype password required',
-            'retypePassword.same' => 'retype password same',
+            'name.required'  => 'Name empty',
+            'email.required' => 'Email empty',
+            'email.email'    => 'Email invalid',
+            'password.required'    => 'Password empty'
         ];
 
+        $validator = Validator::make($request->all(), $rules, $messages);
 
+        if ( ! $validator->passes()) {
+            return $this->returnBadRequest($validator->errors());
+        }
 
-        $request->merge(['password' => Hash::make($request->get('password'))]);
+        $user = $userModel->register($request->name, $request->email, $request->password);
 
-        return $this->returnSuccess('User inregistrat');
+        if(!$user)
+        {
+            return $this->returnNotFound($user['error']);
+        }
     }
 
     /**
-     * Return user
-     *
-     * @return \Illuminate\Http\JsonResponse
+     * Add user
      */
-    public function get()
+    public function addUser(Request $request)
     {
-        try {
-            $user = $this->validateSession();
-            if (!$user) {
-                return $this->returnError('error.token');
-            }
+        $rules = [
+            'name'     => 'required',
+            'email'    => 'required|email',
+            'password' => 'required'
+        ];
+
+        $messages = [
+            'name.required'  => 'Name empty',
+            'email.required' => 'Email empty',
+            'email.email'    => 'Email invalid',
+            'password.required' => 'Password empty'
+
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if ( ! $validator->passes()) {
+            return $this->returnBadRequest();
+        }
+
+        $user = new User([
+            'name' => $request->input('name'),
+            'email' => $request->input('email'),
+            'password' => Hash::make($request->input('password')),
+            'status' => $request->input('status'),
+            'role_id' => $request->input('role_id')
+        ]);
+
+        if($user->save()) {
             return $this->returnSuccess($user);
-        } catch (\Exception $e) {
-            return $this->returnError($e->getMessage());
+        }
+        return $this->returnError('error');
+    }
+
+    /**
+     * Edit user
+     */
+    public function editUser($id, Request $request)
+    {
+        $rules = [
+            'name' => 'required',
+            'email' => 'required|email',
+            'password' => 'required',
+        ];
+
+        $messages = [
+            'name.required' => 'Name empty',
+            'email.required' => 'Email empty',
+            'email.email' => 'Email invalid',
+            'password.required' => 'Password empty',
+        ];
+
+        $validator = Validator::make($request->all(), $rules, $messages);
+
+        if (!$validator->passes()){
+            return $this->returnBadRequest("Test passed");
+        }
+
+        $user = User::find($id);
+        $user->name = $request->input('name');
+        $user->email = $request->input('email');
+        $user->password = $request->input('password');
+        $user->status = $request->input('status');
+        $user->role_id = $request->input('role_id');
+
+        if ($user->update()){
+            return $this->returnSuccess($user);
         }
     }
+
+    /**
+     * Delete user
+     */
+    public function deleteUser($id)
+    {
+        $user = User::find($id);
+        if($user->delete())
+        {
+            return $this->returnSuccess('User deleted');
+        }
+    }
+
     /**
      * Forgot password, generate and send code
      *
@@ -138,10 +202,10 @@ class UserController extends Controller
             }
             $user = $userModel::where('email', $request->get('email'))->get()->first();
             if ($user->status === User::STATUS_UNCONFIRMED) {
-                return $this->returnError('error.account_not_activated');
+                return $this->returnError('account not activated');
             }
             if ($user->updatedAt > Carbon::now()->subMinute()->format('Y-m-d H:i:s')) {
-                return $this->returnError('error.resend_cooldown');
+                return $this->returnError('resend cooldown');
             }
             $userService->sendForgotCode($user);
             return $this->returnSuccess();
@@ -149,6 +213,7 @@ class UserController extends Controller
             return $this->returnError($e->getMessage());
         }
     }
+
     /**
      * Change user password
      *
@@ -168,7 +233,7 @@ class UserController extends Controller
             }
             $request->merge(['password' => Hash::make($request->password)]);
             if (!$user = $userModel->changePassword($request->only('code', 'password'))) {
-                return $this->returnError('error.code_invalid');
+                return $this->returnError('code invalid');
             }
             return $this->returnSuccess();
         } catch (\Exception $e) {

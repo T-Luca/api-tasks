@@ -8,6 +8,7 @@ use Laravel\Lumen\Auth\Authorizable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
+use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 
 class User extends Model implements AuthenticatableContract, AuthorizableContract, JwtPayloadInterface
@@ -26,7 +27,7 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
      * @var array
      */
     protected $fillable = [
-        'name', 'email','role_id', 'status'
+        'name', 'email','password','role_id', 'status'
     ];
 
     /**
@@ -80,6 +81,32 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
 
         return false;
     }
+
+    /**
+     * Register User
+     * @param $userName
+     * @param $userEmail
+     * @param $userPassword
+     * @return bool
+     */
+    public function register($userName, $userEmail, $userPassword)
+    {
+        $user = $this->where([
+            'email' => $userEmail
+        ])->get()->first();
+
+        if (!$user) {
+            return false;
+        }
+
+        $user = $this->create([
+            'name'     => $userName,
+            'email'    => $userEmail,
+            'password' => Hash::make($userPassword),
+        ]);
+        return $user;
+    }
+
     /**
      * Change user password
      *

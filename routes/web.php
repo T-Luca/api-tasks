@@ -31,9 +31,15 @@ $router->group(['namespace' => API_VERSION, 'prefix' => API_VERSION, 'middleware
     $router->post('/register', ['uses' => 'UserController@register']);
     $router->post('/forgot-password', ['uses' => 'UserController@forgotPassword']);
 
+    //Routes with auth
+    $router->post('/addUser',['uses' => 'UserController@addUser']);
+    $router->put('/editUser/{id}',['uses' => 'UserController@editUser']);
+    $router->delete('/deleteUser/{id}',['uses' => 'UserController@deleteUser']);
+
 });
 
 /** Routes with auth */
 $router->group(['namespace' => API_VERSION, 'prefix' => API_VERSION, 'middleware' => 'cors|jwt'], function () use ($router) {
+
 
 });
