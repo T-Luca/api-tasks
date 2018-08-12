@@ -30,16 +30,35 @@ $router->group(['namespace' => API_VERSION, 'prefix' => API_VERSION, 'middleware
     $router->post('/login', ['uses' => 'UserController@login']);
     $router->post('/register', ['uses' => 'UserController@register']);
     $router->post('/forgot-password', ['uses' => 'UserController@forgotPassword']);
-
-    //Routes with auth
-    $router->post('/addUser',['uses' => 'UserController@addUser']);
-    $router->put('/editUser/{id}',['uses' => 'UserController@editUser']);
-    $router->delete('/deleteUser/{id}',['uses' => 'UserController@deleteUser']);
-
+    $router->post('/change-password', ['uses' => 'UserController@changePassword']);
 });
 
 /** Routes with auth */
 $router->group(['namespace' => API_VERSION, 'prefix' => API_VERSION, 'middleware' => 'cors|jwt'], function () use ($router) {
+    $router->group(['prefix' => 'user'], function () use ($router) {
+        $router->get('/', ['uses' => 'UserController@get']);
+        $router->patch('/', ['uses' => 'UserController@update']);
+    });
+    // user tasks
+    $router->group(['prefix' => 'task'], function () use ($router) {
+        $router->patch('/', ['uses' => 'UserController@updateTask']);
+    });
 
+    $router->group(['prefix' => 'admin', 'middleware' => 'admin'], function () use ($router) {
+        $router->get('/users', ['uses' => 'AdminController@getUsers']);
+        $router->group(['prefix' => 'user'], function () use ($router) {
+            $router->post('/', ['uses' => 'AdminController@createUser']);
+            $router->patch('/{id}', ['uses' => 'AdminController@updateUser']);
+            $router->delete('/{id}', ['uses' => 'AdminController@deleteUser']);
+        });
+        //admin tasks
+        $router->get('/tasks', ['uses' => 'TaskController@getTasks']);
+        $router->group(['prefix' => 'task'], function () use ($router) {
+            $router->post('/', ['uses' => 'TaskController@createTask']);
+            $router->patch('/{id}', ['uses' => 'TaskController@updateTask']);
+            $router->delete('/{id}', ['uses' => 'TaskController@deleteTask']);
+        });
+    });
 
+    $router->post('/addComment/{id}',['uses' => 'UserController@addComment']);
 });

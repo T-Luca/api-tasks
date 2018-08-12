@@ -8,18 +8,21 @@ use Laravel\Lumen\Auth\Authorizable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
 use Illuminate\Contracts\Auth\Access\Authorizable as AuthorizableContract;
-use Illuminate\Support\Facades\Hash;
-use Carbon\Carbon;
 
+/**
+ * Class User
+ *
+ * @package App
+ */
 class User extends Model implements AuthenticatableContract, AuthorizableContract, JwtPayloadInterface
 {
     use Authenticatable, Authorizable;
 
     /** @var int */
-    const STATUS_UNCONFIRMED = 0;
-    /** @var int */
+    const STATUS_ACTIVE = 1;
 
-    const STATUS_CONFIRMED = 1;
+    /** @var int */
+    const STATUS_INACTIVE = 0;
 
     /**
      * The attributes that are mass assignable.
@@ -27,7 +30,11 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
      * @var array
      */
     protected $fillable = [
-        'name', 'email','password','role_id', 'status'
+        'name',
+        'email',
+        'role_id',
+        'status',
+        'forgot_code'
     ];
 
     /**
@@ -39,6 +46,17 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
         'password',
     ];
 
+    protected $visible = [
+        'name',
+        'email',
+        'role_id'
+    ];
+
+    /**
+     * Jwt payload
+     *
+     * @return array
+     */
     public function getPayload()
     {
         return [
@@ -50,9 +68,34 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
         ];
     }
 
+    /**
+     * User role
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
     public function role()
     {
         return $this->belongsTo('App/Role');
+    }
+
+    /**
+     * User assigned tasks
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function tasks()
+    {
+        return $this->hasMany('App/Task', 'assign', 'id');
+    }
+
+    /**
+     * User notifications
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function notifications()
+    {
+        return $this->hasMany('App/Notification');
     }
 
     /**
@@ -80,52 +123,5 @@ class User extends Model implements AuthenticatableContract, AuthorizableContrac
         }
 
         return false;
-    }
-
-    /**
-     * Register User
-     * @param $userName
-     * @param $userEmail
-     * @param $userPassword
-     * @return bool
-     */
-    public function register($userName, $userEmail, $userPassword)
-    {
-        $user = $this->where([
-            'email' => $userEmail
-        ])->get()->first();
-
-        if (!$user) {
-            return false;
-        }
-
-        $user = $this->create([
-            'name'     => $userName,
-            'email'    => $userEmail,
-            'password' => Hash::make($userPassword),
-        ]);
-        return $user;
-    }
-
-    /**
-     * Change user password
-     *
-     * @param $userDetails
-     *
-     * @return User|bool
-     */
-    public function changePassword($userDetails)
-    {
-        /** @var User $user */
-        $user = $this->where('forgot_password_code', $userDetails['code'])
-            ->where('generated_forgot_password', '<', Carbon::now()->addHour()->format('Y-m-d H:i:s'))
-            ->get()->first();
-        if (!$user) {
-            return false;
-        }
-        $user->forgotPasswordCode = '';
-        $user->password = $userDetails['password'];
-        $user->save();
-        return $user;
     }
 }
